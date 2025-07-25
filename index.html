@@ -78,7 +78,7 @@
     <button onclick="joinGame()">入室する</button>
 
     <button onclick="clearAllPlayers()">参加者を全員削除</button>
-    <h3>参加者管理</h3>
+    <h3>参加者リスト</h3>
     <div id="playerList"></div>
     <button id="resetVisionBtn" class="hidden" onclick="resetVision()">透視回数をリセット</button>
   </div>
@@ -191,7 +191,7 @@
           const max = Math.max(...numbers);
 
           const status = isKing
-            ? `${currentUserName}さん、あなたは王様です\n👑\n現在${min}番から${max}番が参加中です。`
+            ? `${currentUserName}さん、あなたは王様です👑\n現在${min}番から${max}番が参加中です。`
             : `${currentUserName}さん、あなたは ${me.number} 番です。`;
 
           document.getElementById("statusText").textContent = status;
@@ -251,12 +251,12 @@
       if (currentUserName === "じゅんぺい") {
         const log = snapshot.val();
         const logArea = document.getElementById("visionNotice");
-        logArea.textContent += `${log.from}が透視能力を発動しました\n`;
+        logArea.textContent += `${log.from}\n`;
       }
     });
 
     function showShuffled() {
-      const comment = "※番号を選ぶのが面倒な時に使ってください。\nまた、王様も含めた表示になるので\nゲーム内容によっては参加してみてもOKです。\n\n";
+      const comment = "※番号を選ぶのが面倒な時に使ってね。\nまた、王様も含めた表示になります。\n興味のある内容には参加してみてね！。\n\n";
       db.ref("players").once("value", snapshot => {
         const players = [];
         snapshot.forEach(child => {
