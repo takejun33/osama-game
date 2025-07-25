@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>王様ゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+      background: linear-gradient(#ffefba, #ffffff);
+    }
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      color: #d35400;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #f39c12;
+      color: white;
+      border: none;
+    }
+    button:hover {
+      background-color: #e67e22;
+    }
+    .hidden { display: none; }
+    .info {
+      margin: 10px 0;
+      font-size: 1.2em;
+      text-align: center;
+      white-space: pre-line;
+    }
+    .result {
+      white-space: pre-line;
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #ffeeba;
+      text-align: center;
+      margin-top: 10px;
+    }
+    .player-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+      font-size: 0.95em;
+      background-color: #f9f9f9;
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+    .player-item button {
+      background-color: #e74c3c;
+      padding: 5px 10px;
+      font-size: 0.8em;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>王様ゲーム👑</h1>
+
+  <div id="loginArea">
+    <input type="text" id="nameInput" placeholder="名前を入力">
+    <button onclick="joinGame()">入室する</button>
+
+    <button onclick="clearAllPlayers()">参加者を全員削除</button>
+    <h3>参加者管理</h3>
+    <div id="playerList"></div>
+    <button id="resetVisionBtn" class="hidden" onclick="resetVision()">透視回数をリセット</button>
+  </div>
+
+  <div id="gameArea" class="hidden">
+    <div class="info" id="statusText">ゲームが開始されるまでお待ちください…</div>
+    <button id="startGameBtn" class="hidden" onclick="startGame()">ゲーム開始</button>
+    <button id="visionBtn" class="hidden" onclick="useVision()">透視する</button>
+    <button id="shuffleBtn" class="hidden" onclick="showShuffled()">番号をランダムで表示</button>
+    <div class="result" id="resultArea"></div>
+    <div class="info" id="visionNotice"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDBajUmjePT6OL9XKhelfYpeQeEtaa3nKE",
+      authDomain: "osamagame-b6644.firebaseapp.com",
+      databaseURL: "https://osamagame-b6644-default-rtdb.firebaseio.com",
+      projectId: "osamagame-b6644",
+      storageBucket: "osamagame-b6644.appspot.com",
+      messagingSenderId: "109937444224",
+      appId: "1:109937444224:web:ddbf619eeb39f902992d65",
+      measurementId: "G-3W8PM38GVM"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentUserId = null;
+    let currentUserName = "";
+    let isKing = false;
+
+    function joinGame() {
+      const name = document.getElementById("nameInput").value.trim();
+      if (!name) return alert("名前を入力してください");
+      const playerRef = db.ref("players").push();
+      playerRef.set({ name, number: null, usedVision: false, everUsedVision: false });
+      currentUserId = playerRef.key;
+      currentUserName = name;
+
+      document.getElementById("loginArea").classList.add("hidden");
+      document.getElementById("gameArea").classList.remove("hidden");
+
+      db.ref("gameState").once("value", snapshot => {
+        const game = snapshot.val();
+        if (!game && name === "じゅんぺい") {
+          document.getElementById("startGameBtn").classList.remove("hidden");
+          document.getElementById("resetVisionBtn").classList.remove("hidden");
+        }
+      });
+    }
+
+    function clearAllPlayers() {
+      db.ref("players").remove();
+      db.ref("gameState").remove();
+      alert("参加者を全員削除しました");
+      location.reload();
+    }
+
+    function startGame() {
+      db.ref("players").once("value", snapshot => {
+        const players = [];
+        snapshot.forEach(child => {
+          players.push({ id: child.key, name: child.val().name });
+        });
+
+        if (players.length < 2) {
+          alert("2人以上で開始してください");
+          return;
+        }
+
+        const kingIndex = Math.floor(Math.random() * players.length);
+        const kingId = players[kingIndex].id;
+        const others = players.filter(p => p.id !== kingId);
+
+        for (let i = others.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [others[i], others[j]] = [others[j], others[i]];
+        }
+
+        const updates = {};
+        updates[`players/${kingId}/number`] = "王様";
+        others.forEach((p, i) => {
+          updates[`players/${p.id}/number`] = i + 1;
+          updates[`players/${p.id}/usedVision`] = false;
+        });
+
+        db.ref().update(updates);
+        db.ref("gameState").set({ kingId });
+      });
+    }
+
+    db.ref("gameState").on("value", snapshot => {
+      const game = snapshot.val();
+      if (!game || !currentUserId) return;
+
+      db.ref(`players/${currentUserId}`).once("value", snap => {
+        const me = snap.val();
+        isKing = (game.kingId === currentUserId);
+
+        db.ref("players").once("value", allSnap => {
+          const players = [];
+          allSnap.forEach(child => {
+            players.push({ id: child.key, name: child.val().name, number: child.val().number });
+          });
+
+          const numbers = players.filter(p => p.number !== "王様").map(p => p.number);
+          const min = Math.min(...numbers);
+          const max = Math.max(...numbers);
+
+          const status = isKing
+            ? `${currentUserName}さん、あなたは王様です\n👑\n現在${min}番から${max}番が参加中です。`
+            : `${currentUserName}さん、あなたは ${me.number} 番です。`;
+
+          document.getElementById("statusText").textContent = status;
+          document.getElementById("statusText").style.textAlign = "center";
+
+          document.getElementById("visionBtn").classList.toggle("hidden", !isKing || me.everUsedVision);
+          document.getElementById("shuffleBtn").classList.toggle("hidden", !isKing);
+          document.getElementById("resultArea").textContent = "";
+
+          // ✅ 「じゅんぺい」または王様のみ「ゲーム開始」ボタン表示
+          const isJunpei = currentUserName === "じゅんぺい";
+          const isCurrentUserKing = me.number === "王様";
+          if (isJunpei || isCurrentUserKing) {
+            document.getElementById("startGameBtn").classList.remove("hidden");
+          } else {
+            document.getElementById("startGameBtn").classList.add("hidden");
+          }
+        });
+      });
+    });
+
+    function useVision() {
+      db.ref(`players/${currentUserId}`).once("value", snap => {
+        const me = snap.val();
+        if (me.usedVision) {
+          alert("透視はすでに使用済みです");
+          return;
+        }
+
+        db.ref(`players/${currentUserId}`).update({ usedVision: true, everUsedVision: true });
+
+        db.ref("players").once("value", snapshot => {
+          const players = [];
+          snapshot.forEach(child => {
+            const p = child.val();
+            if (child.key !== currentUserId && p.number !== "王様") {
+              players.push({ number: p.number, name: p.name });
+            }
+          });
+
+          players.sort((a, b) => a.number - b.number);
+          const result = players.map(p => `${p.number}番は ${p.name} です。`).join("\n");
+          document.getElementById("resultArea").textContent = result;
+
+          db.ref("players").once("value", snap => {
+            snap.forEach(child => {
+              if (child.val().name === "じゅんぺい" && currentUserName !== "じゅんぺい") {
+                db.ref("visionLog").push({ from: currentUserName });
+              }
+            });
+          });
+        });
+      });
+    }
+
+    db.ref("visionLog").on("child_added", snapshot => {
+      if (currentUserName === "じゅんぺい") {
+        const log = snapshot.val();
+        const logArea = document.getElementById("visionNotice");
+        logArea.textContent += `${log.from}が透視能力を発動しました\n`;
+      }
+    });
+
+    function showShuffled() {
+      const comment = "※番号を選ぶのが面倒な時に使ってください。\nまた、王様も含めた表示になるので\nゲーム内容によっては参加してみてもOKです。\n\n";
+      db.ref("players").once("value", snapshot => {
+        const players = [];
+        snapshot.forEach(child => {
+          const p = child.val();
+          players.push(p.number === "王様" ? "王様" : p.number);
+        });
+        shuffleArray(players);
+        document.getElementById("resultArea").textContent = comment + players.join("\n");
+        document.getElementById("resultArea").style.textAlign = "center";
+      });
+    }
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    db.ref("players").on("value", snapshot => {
+      const list = document.getElementById("playerList");
+      list.innerHTML = "";
+      snapshot.forEach(child => {
+        const p = child.val();
+        const div = document.createElement("div");
+        div.className = "player-item";
+        div.innerHTML = `<span>${p.name}</span>`;
+        list.appendChild(div);
+      });
+    });
+
+    function resetVision() {
+      db.ref("players").once("value", snapshot => {
+        snapshot.forEach(child => {
+          db.ref(`players/${child.key}/usedVision`).set(false);
+        });
+      });
+      alert("透視回数をリセットしました");
+    }
+  </script>
+</body>
+</html>
