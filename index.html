@@ -256,7 +256,7 @@
     });
 
     function showShuffled() {
-      const comment = "※番号を選ぶのが面倒な時に使ってね。\nまた、王様も含めた表示になります。\n興味のある内容には参加してみてね！。\n\n";
+      const comment = "※番号を選ぶのが面倒な時に使ってね。\nまた、王様も含めた表示になります。\n興味のある内容には参加してみてね！\n\n";
       db.ref("players").once("value", snapshot => {
         const players = [];
         snapshot.forEach(child => {
